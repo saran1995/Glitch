@@ -4,6 +4,13 @@ import threading
 import time
 import math
 
+import speech_recognition as sr
+import sys
+from pathlib import Path
+
+# Add src to path for imports
+sys.path.append(str(Path(__file__).parent / "src"))
+
 
 class GlitchGUI:
     def __init__(self, root):
@@ -18,6 +25,76 @@ class GlitchGUI:
 
         self.setup_gui()
         self.start_animation()
+        self.setup_wake_word_detection()
+
+    def setup_wake_word_detection(self):
+        """Initialize Whisper-based wake word detection"""
+        try:
+            print("🚀 Setting up Whisper wake word detection...")
+
+            from src.audio.wake_word_detector import GlitchWhisperWakeDetector
+
+            self.wake_detector = GlitchWhisperWakeDetector()
+
+            if self.wake_detector.initialize():
+                self.wake_detector.set_wake_callback(self.on_wake_word_detected)
+                self.has_wake_detection = True
+                print("✅ Whisper wake word detection ready!")
+            else:
+                self.has_wake_detection = False
+                print("❌ Whisper wake word detection failed")
+
+        except Exception as e:
+            print(f"❌ Whisper setup failed: {e}")
+            import traceback
+            traceback.print_exc()
+            self.has_wake_detection = False
+
+    def on_wake_word_detected(self, wake_word, full_text):
+        """Handle wake word detection"""
+        print(f"🚨 WAKE WORD: '{wake_word}' in '{full_text}'")
+
+        # Update GUI on main thread
+        self.root.after(100, lambda: self.wake_up_glitch(wake_word))
+
+    def wake_up_glitch(self, wake_word):
+        """Wake up Glitch with animation"""
+        self.change_state("listening")
+        self.status_label.config(text=f"👋 Hey! I heard '{wake_word}'!")
+
+        # Return to sleep after 3 seconds
+        self.root.after(3000, lambda: self.change_state("sleeping"))
+
+    # Add wake word control buttons
+    def create_control_buttons(self):
+        # ... your existing button code ...
+
+        # Add wake word button if available
+        if hasattr(self, 'has_wake_detection') and self.has_wake_detection:
+            self.wake_btn = tk.Button(
+                button_frame,
+                text="👂 Start Wake",
+                command=self.toggle_wake_listening,
+                bg="#440088",
+                fg="white",
+                font=("Arial", 12),
+                width=12
+            )
+            self.wake_btn.pack(side=tk.LEFT, padx=5)
+
+    def toggle_wake_listening(self):
+        """Toggle wake word listening"""
+        if not hasattr(self, 'wake_detector'):
+            return
+
+        if self.wake_detector.is_listening:
+            self.wake_detector.stop_listening_for_wake()
+            self.wake_btn.config(text="👂 Start Wake", bg="#440088")
+            self.status_label.config(text="🔇 Wake detection off")
+        else:
+            self.wake_detector.start_listening()
+            self.wake_btn.config(text="👂 Stop Wake", bg="#880044")
+            self.status_label.config(text="👂 Listening for 'Hey Glitch'...")
 
     def setup_gui(self):
         """Setup the basic GUI components"""
